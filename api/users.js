@@ -55,7 +55,7 @@ usersRouter.post('/login', async (req, res, next) => {
       if (_user) {
         next({
           name: 'UserExistsError',
-          message: 'A user by that username already exists'
+          message: 'user already exists'
         });
       }
   
