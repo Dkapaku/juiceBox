@@ -52,7 +52,17 @@ async function updateUser(id, fields = {}) {
     throw error;
   }
 }
+async function getAllTags() {
+  try{
+    const {rows} = await client.query(`
+    SELECT *
+    FROM tags;
+    `);
 
+  }catch (error){
+    throw error;
+  }
+}
 async function getAllUsers() {
   try {
     const { rows } = await client.query(`
@@ -116,11 +126,11 @@ async function getUserById(userId) {
   }
 }
 
-
 async function createPost({
   authorId,
   title,
-  content
+  content,
+  tags = []
 }) {
   try {
     const { rows: [ post ] } = await client.query(`
@@ -129,7 +139,9 @@ async function createPost({
       RETURNING *;
     `, [authorId, title, content]);
 
-    return post;
+    const tagList = await createTags(tags);
+
+    return await addTagsToPost(post.id, tagList);
   } catch (error) {
     throw error;
   }
@@ -201,6 +213,23 @@ async function updatePost(postId, fields = {}) {
   throw error;
   }
 }
+async function getPostsByTagName(tagName) {
+  try {
+    const { rows: postIds } = await client.query(`
+      SELECT posts.id
+      FROM posts
+      JOIN post_tags ON posts.id=post_tags."postId"
+      JOIN tags ON tags.id=post_tags."tagId"
+      WHERE tags.name=$1;
+    `, [tagName]);
+
+    return await Promise.all(postIds.map(
+      post => getPostById(post.id)
+    ));
+  } catch (error) {
+    throw error;
+  }
+} 
 
 async function getAllPosts() {
   try {
@@ -256,7 +285,12 @@ async function getPostById(postId) {
       FROM posts
       WHERE id=$1;
     `, [postId]);
-
+    if (!post) {
+      throw {
+        name: "PostNotFoundError",
+        message: "Could not find a post with that postId"
+      };
+    }
     const { rows: tags } = await client.query(`
       SELECT tags.*
       FROM tags
@@ -281,10 +315,23 @@ async function getPostById(postId) {
   }
 }
 
+async function getUserByUsername(username) {
+  try {
+    const { rows: [user] } = await client.query(`
+      SELECT *
+      FROM users
+      WHERE username=$1;
+    `, [username]);
 
+    return user;
+  } catch (error) {
+    throw error;
+  }
+}
 
 module.exports = {  
   client,
+  getUserByUsername,
   createUser,
   updateUser,
   getAllUsers,
@@ -294,5 +341,7 @@ module.exports = {
   getAllPosts,
   getPostsByUser,
   addTagsToPost,
-  createTags
+  createTags,
+  getPostsByTagName,
+  getAllTags,
 }
